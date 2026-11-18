@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>Inventory Movement Parser | Dr Mourad</title>
+<style>
+:root{color-scheme:dark;--bg:#08111f;--panel:#101c2e;--panel2:#15243a;--line:#263852;--text:#eef4ff;--muted:#9fb0c8;--cyan:#55d6d0;--blue:#6d9cff;--green:#43d6a0;--red:#ff7e87;--amber:#ffc66d}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 85% -10%,#18385b 0%,transparent 60%),var(--bg);color:var(--text);font-family:Tahoma,Arial,sans-serif;min-height:100vh}
+.app{max-width:1440px;margin:auto;padding:18px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.brand h1{font-size:clamp(20px,3vw,30px);margin:0 0 6px}.brand p{margin:0;color:var(--muted);font-size:13px}.tag{border:1px solid #2d5066;color:var(--cyan);padding:8px 12px;border-radius:999px;font-size:12px;white-space:nowrap}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}.stat,.panel{background:linear-gradient(145deg,#122137,#0e192a);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 35px #0003}.stat{padding:15px}.stat small{color:var(--muted)}.stat strong{display:block;font-size:26px;margin-top:7px;direction:ltr;text-align:right}
+.layout{display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:14px}.panel{padding:16px;margin-bottom:14px}.panel h2{font-size:16px;margin:0 0 13px}.drop{border:1px dashed #4b6a8e;background:#0b1728;border-radius:14px;padding:20px;text-align:center;cursor:pointer}.drop:hover{border-color:var(--cyan)}.drop b{display:block;margin:8px 0}.drop span{font-size:12px;color:var(--muted)}input,select,textarea{width:100%;background:#091525;color:var(--text);border:1px solid #30435e;border-radius:10px;padding:11px;font:inherit;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--cyan)}textarea{min-height:130px;resize:vertical;line-height:1.6}.btn{border:0;border-radius:10px;padding:11px 14px;font:inherit;font-weight:bold;cursor:pointer;background:linear-gradient(120deg,#2a9d9a,#3479d8);color:white}.btn.secondary{background:#22344e;border:1px solid #3a506f}.btn.export{background:linear-gradient(120deg,#158b68,#1ca77b)}.btn:disabled{opacity:.45;cursor:not-allowed}.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}.hint{font-size:12px;color:var(--muted);line-height:1.7}.progress{height:7px;background:#24344b;border-radius:99px;overflow:hidden;margin:12px 0}.progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--blue));transition:width .2s}.filters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:13px;max-height:60vh}table{border-collapse:collapse;width:100%;min-width:850px;background:#0b1728}th,td{padding:11px 10px;border-bottom:1px solid #203149;text-align:right;font-size:13px}th{position:sticky;top:0;background:#172943;color:#b9d7f3;z-index:1}tbody tr:hover{background:#14243a}.empty{text-align:center;color:var(--muted);padding:28px}.status{font-size:12px;color:var(--muted);margin-top:8px;min-height:18px}.pill{display:inline-block;padding:4px 8px;border-radius:99px;background:#183b4a;color:#8de9dc;font-size:11px}.foot{text-align:center;color:#71839c;font-size:11px;padding:15px}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.filters{grid-template-columns:1fr 1fr}.table-wrap{max-height:55vh}}
+@media(max-width:480px){.app{padding:10px}.top{align-items:flex-start}.tag{font-size:10px;padding:6px 8px}.stats{gap:7px}.stat{padding:10px}.stat strong{font-size:21px}.stat small{font-size:11px}.panel{padding:12px;border-radius:14px}.filters{grid-template-columns:1fr 1fr}.filters input:first-child{grid-column:1/-1}.row{gap:6px}.btn{padding:10px;font-size:13px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><div class="brand"><h1>محلل حركة الأصناف</h1><p>Inventory Movement Parser · Dr Mourad Sadek Pharmacies</p></div><span class="tag">SMART INVENTORY ANALYTICS</span></header>
+<section class="stats">
+ <div class="stat"><small>إجمالي الحركات المعروضة</small><strong id="sMoves">0</strong></div>
+ <div class="stat"><small>عدد الأصناف</small><strong id="sItems">0</strong></div>
+ <div class="stat"><small>عدد الموظفين</small><strong id="sStaff">0</strong></div>
+</section>
+<div class="layout">
+<aside>
+ <section class="panel">
+  <h2>① استيراد تقرير PDF</h2>
+  <label class="drop" for="pdfFile"><div style="font-size:30px">📄</div><b>اضغط لاختيار ملف PDF</b><span>يدعم التقارير متعددة الصفحات</span></label>
+  <input id="pdfFile" type="file" accept="application/pdf" hidden>
+  <div class="progress"><i id="progressBar"></i></div><div class="status" id="pdfStatus">لم يتم اختيار ملف بعد</div>
+  <p class="hint">تتم معالجة الملف داخل المتصفح. يفضّل استخدام ملف التقرير الأصلي للحصول على أفضل نتيجة.</p>
+ </section>
+ <section class="panel">
+  <h2>② نسخ ولصق نص التقرير</h2>
+  <textarea id="pasteInput" placeholder="الصق نص التقرير هنا...&#10;مثال:&#10;كود الصنف: 00368 | الوحدة: علبة | إسم الصنف: رباط ضاغط&#10;التاريخ: 17/11/2026 09:31 | نوع الحركة: بيع | المستخدم: Esraa"></textarea>
+  <div class="row" style="margin-top:9px"><button class="btn" id="parsePaste">تحليل النص</button><button class="btn secondary" id="clearPaste">مسح</button></div>
+  <div class="status" id="pasteStatus"></div>
+ </section>
+ <section class="panel">
+  <h2>ملاحظات التحليل</h2>
+  <div class="hint">• يتم ربط كل حركة بآخر كود واسم صنف تم التعرف عليهما.<br>• يتم تجاهل الإجماليات وأرصدة بداية ونهاية الفترة.<br>• راجع النتائج خصوصًا عند اختلاف تنسيق التقرير أو استخراج PDF ممسوح ضوئيًا.</div>
+ </section>
+</aside>
+<main>
+ <section class="panel">
+  <div class="row" style="align-items:center;margin-bottom:12px"><h2 style="margin:0;flex:2">نتائج تحليل الحركات</h2><button class="btn export" id="exportBtn" disabled>⬇ تصدير Excel</button><button class="btn secondary" id="resetBtn">إفراغ النتائج</button></div>
+  <div class="filters">
+   <input id="searchBox" placeholder="بحث بالكود أو اسم الصنف...">
+   <select id="employeeFilter"><option value="">كل الموظفين</option></select>
+   <select id="typeFilter"><option value="">كل أنواع الحركة</option></select>
+   <input id="dateFilter" type="date" title="فلترة بالتاريخ">
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>كود الصنف</th><th>اسم الصنف</th><th>نوع الحركة</th><th>التاريخ والوقت</th><th>اسم الموظف</th></tr></thead><tbody id="results"><tr><td colspan="5" class="empty">ارفع تقرير PDF أو الصق النص لبدء التحليل</td></tr></tbody></table></div>
+  <div class="status" id="resultStatus">لا توجد بيانات حتى الآن</div>
+ </section>
+</main>
+</div>
+<div class="foot">Inventory Movement Parser · يعمل محليًا داخل المتصفح · راجع عينة النتائج قبل اعتمادها</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id);let allRows=[];
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const clean=s=>String(s||'').replace(/\u0640/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/\s+/g,' ').trim();
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function parseText(raw){
+ const lines=String(raw||'').replace(/\r/g,'').split('\n').map(x=>x.replace(/[\u200e\u200f\u202a-\u202e]/g,'').trim()).filter(Boolean);
+ const out=[];let code='',name='';
+ const norm=s=>String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\u0640/g,'').trim();
+ const cleanName=s=>String(s||'').replace(/^\*{1,2}\s*/,'').replace(/\s*\*{1,2}$/,'').replace(/\s+/g,' ').trim();
+ const summary=/إجم?ا?ل[ىي].*(?:اليوم|حركات الصنف)|رصيد (?:بداية|نهاية) الفترة|Page\s+\d+\s+of\s+\d+/i;
+ const dateRe=/(\d{1,2}:\d{2})\s*([صمAP]M?)?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4})/i;
+ const knownStaff=['Dr. Ehab Turki','Dr/Do3aa','Poula Hany','Eman Saber','A.Mohsen','Abouda','Esraa','kerols','Rzk'];
+ const knownTypes=['تسوية بيع بدون رصيد','مرتجع بيع على فاتورة','مرتجع بيع','مرتجع شراء','تسوية','استلام','إستلم','بيع','شراء','صرف','إضافة','تحويل','هالك','تالف','تسوية جرد'];
+ const normalizeType=s=>String(s||'').replace(/\s+/g,' ').trim();
+ for(const original of lines){
+  const line=norm(original);
+  if(summary.test(line))continue;
+
+  // Product header: the report prints the value next to its label, often in RTL extraction order.
+  // Both product fields are printed on the SAME line in this report.
+  let codeMatch=line.match(/([A-Za-z0-9_-]{2,})\s*كود\s*الصنف/i);
+  let nameMatch=line.match(/^(.+?)\s*(?:إسم|اسم)\s*الصنف/i);
+  if(codeMatch) code=codeMatch[1].trim();
+  if(nameMatch) name=cleanName(nameMatch[1]).replace(/^[-–—]+\s*/, '').trim();
+  if(codeMatch||nameMatch) continue;
+  // Alternate extraction order from some PDF viewers.
+  codeMatch=line.match(/(?:كود\s*الصنف)\s*[:：]?\s*([A-Za-z0-9_-]+)/i);
+  nameMatch=line.match(/(?:إسم|اسم)\s*الصنف\s*[:：]?\s*(.+)$/i);
+  if(codeMatch) code=codeMatch[1].trim();
+  if(nameMatch) name=cleanName(nameMatch[1]);
+  if(codeMatch||nameMatch) continue;
+
+  const dm=line.match(dateRe);
+  if(!dm||!code)continue;
+  const date=`${dm[3]} ${dm[1]}${dm[2]?' '+dm[2]:''}`;
+  const prefix=line.slice(0,dm.index).trim();
+  if(!prefix)continue;
+
+  // The row columns, from left to right in the PDF's visual layout, include
+  // employee, destination, document number, quantity, expiry, movement type.
+  // The document number and quantity are the most reliable anchors.
+  const docMatches=[...prefix.matchAll(/(?:^|\s)(\d{4,8})(?=\s|$)/g)];
+  let docNo='',employee='',qty='',type='';
+  if(docMatches.length){
+    const doc=docMatches[docMatches.length-1];
+    docNo=doc[1];
+    const before=prefix.slice(0,doc.index).trim();
+    const staff=knownStaff.find(n=>before.startsWith(n));
+    employee=staff||before.replace(/^[.،|]+\s*/,'').replace(/\s+(?:من فرع|إلى فرع|استبدال|\().*$/,'').trim();
+    const after=prefix.slice(doc.index+doc[0].length).trim();
+    const qm=after.match(/(-?\d+(?:\.\d+)?)/);
+    if(qm){
+      qty=qm[1];
+      const afterQty=after.slice(qm.index+qm[0].length).trim();
+      const typeCandidates=knownTypes.sort((a,b)=>b.length-a.length);
+      type=typeCandidates.find(t=>afterQty.includes(t))||afterQty.replace(/\b\d{1,2}\/\d{4}\b/g,'').trim();
+    }
+  }
+
+  // Fallback for extracted text where columns are not kept in their original order.
+  if(!type){
+    const afterDate=line.slice(dm.index+dm[0].length);
+    type=knownTypes.sort((a,b)=>b.length-a.length).find(t=>line.includes(t))||'';
+  }
+  type=normalizeType(type);
+  employee=employee.replace(/[.،|]+$/,'').trim();
+  if(code&&type){
+    out.push({code,name,type,date,employee,docNo,qty});
+  }
+ }
+ return out;
+}
+function addRows(rows){const seen=new Set(allRows.map(r=>[r.code,r.date,r.type,r.employee,r.docNo||'',r.qty||''].join('|')));for(const r of rows){const k=[r.code,r.date,r.type,r.employee,r.docNo||'',r.qty||''].join('|');if(r.code&&r.type&&!seen.has(k)){allRows.push(r);seen.add(k)}}render()}
+function filtered(){const q=clean($('searchBox').value).toLowerCase(),emp=$('employeeFilter').value,type=$('typeFilter').value,date=$('dateFilter').value;return allRows.filter(r=>(!q||clean(r.code+' '+r.name).toLowerCase().includes(q))&&(!emp||r.employee===emp)&&(!type||r.type===type)&&(!date||r.date.includes(date.split('-').reverse().join('/'))||r.date.includes(date)))}
+function render(){
+ const rows=filtered(),body=$('results');$('sMoves').textContent=rows.length.toLocaleString('en');$('sItems').textContent=new Set(rows.map(r=>r.code)).size.toLocaleString('en');$('sStaff').textContent=new Set(rows.map(r=>r.employee).filter(Boolean)).size.toLocaleString('en');
+ body.innerHTML=rows.length?rows.map(r=>`<tr><td dir="ltr">${esc(r.code)}</td><td>${esc(r.name)}</td><td><span class="pill">${esc(r.type)}</span></td><td dir="ltr">${esc(r.date)}</td><td dir="ltr">${esc(r.employee||'—')}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">لا توجد نتائج مطابقة للفلاتر</td></tr>';
+ $('resultStatus').textContent=`عرض ${rows.length} من أصل ${allRows.length} حركة`; $('exportBtn').disabled=!rows.length;
+ const emps=[...new Set(allRows.map(r=>r.employee).filter(Boolean))].sort(),types=[...new Set(allRows.map(r=>r.type).filter(Boolean))].sort(),oldE=$('employeeFilter').value,oldT=$('typeFilter').value;
+ $('employeeFilter').innerHTML='<option value="">كل الموظفين</option>'+emps.map(x=>`<option>${esc(x)}</option>`).join('');$('typeFilter').innerHTML='<option value="">كل أنواع الحركة</option>'+types.map(x=>`<option>${esc(x)}</option>`).join('');$('employeeFilter').value=emps.includes(oldE)?oldE:'';$('typeFilter').value=types.includes(oldT)?oldT:'';
+}
+['searchBox','employeeFilter','typeFilter','dateFilter'].forEach(id=>$(id).addEventListener('input',render));
+$('parsePaste').onclick=()=>{const rows=parseText($('pasteInput').value);addRows(rows);$('pasteStatus').textContent=`تم استخراج ${rows.length} حركة من النص. راجع النتائج.`};
+$('clearPaste').onclick=()=>{$('pasteInput').value='';$('pasteStatus').textContent=''};
+$('resetBtn').onclick=()=>{allRows=[];render();$('pdfStatus').textContent='تم إفراغ النتائج'};
+$('exportBtn').onclick=()=>{const rows=filtered().map(r=>({'كود الصنف':r.code,'اسم الصنف':r.name,'نوع الحركة':r.type,'التاريخ والوقت':r.date,'اسم الموظف':r.employee,'رقم المستند':r.docNo||'','الكمية':r.qty||''}));if(!window.XLSX){alert('مكتبة Excel غير متاحة. تحقق من اتصال الإنترنت.');return}const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Movements');XLSX.writeFile(wb,'Inventory_Movements.xlsx')};
+$('pdfFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(!window.pdfjsLib){$('pdfStatus').textContent='تعذر تحميل مكتبة PDF.js. تحقق من الإنترنت.';return}
+ try{const data=await file.arrayBuffer(),pdf=await pdfjsLib.getDocument({data}).promise,all=[];$('pdfStatus').textContent=`جاري قراءة ${pdf.numPages} صفحة...`;for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p),content=await page.getTextContent();all.push(rebuildPage(content.items));$('progressBar').style.width=(p/pdf.numPages*100)+'%';$('pdfStatus').textContent=`تمت معالجة الصفحة ${p} من ${pdf.numPages}`;await new Promise(r=>setTimeout(r,0))}
+ const extracted=parseText(all.join('\n'));addRows(extracted);$('pdfStatus').textContent=`اكتملت المعالجة: ${pdf.numPages} صفحة، وتم استخراج ${extracted.length} حركة. راجع النتائج.`;if(!extracted.length)$('pdfStatus').textContent+=' قد يحتاج تنسيق التقرير إلى ضبط إضافي أو أن الملف ممسوح ضوئيًا.';
+ }catch(err){console.error(err);$('pdfStatus').textContent='حدث خطأ أثناء قراءة PDF: '+err.message}
+};
+function rebuildPage(items){
+ // Group PDF.js text items by vertical coordinate, then order each visual line from right to left.
+ const lines=[];for(const it of items){if(!it.str||!it.str.trim())continue;const y=Math.round(it.transform[5]/2)*2;let line=lines.find(l=>Math.abs(l.y-y)<=3);if(!line){line={y,items:[]};lines.push(line)}line.items.push({x:it.transform[4],s:it.str})}
+ return lines.sort((a,b)=>b.y-a.y).map(l=>l.items.sort((a,b)=>b.x-a.x).map(x=>x.s).join(' ')).join('\n');
+}
+render();
+})();
+</script>
+</body></html>
