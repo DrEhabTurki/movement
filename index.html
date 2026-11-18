@@ -52,7 +52,7 @@
    <select id="typeFilter"><option value="">كل أنواع الحركة</option></select>
    <input id="dateFilter" type="date" title="فلترة بالتاريخ">
   </div>
-  <div class="table-wrap"><table><thead><tr><th>كود الصنف</th><th>اسم الصنف</th><th>نوع الحركة</th><th>التاريخ والوقت</th><th>اسم الموظف</th></tr></thead><tbody id="results"><tr><td colspan="5" class="empty">ارفع تقرير PDF أو الصق النص لبدء التحليل</td></tr></tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th>كود الصنف</th><th>اسم الصنف</th><th>نوع الحركة</th><th>الكمية</th><th>رقم المستند</th><th>التاريخ والوقت</th><th>اسم الموظف</th></tr></thead><tbody id="results"><tr><td colspan="5" class="empty">ارفع تقرير PDF أو الصق النص لبدء التحليل</td></tr></tbody></table></div>
   <div class="status" id="resultStatus">لا توجد بيانات حتى الآن</div>
  </section>
 </main>
@@ -70,68 +70,57 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function parseText(raw){
  const lines=String(raw||'').replace(/\r/g,'').split('\n').map(x=>x.replace(/[\u200e\u200f\u202a-\u202e]/g,'').trim()).filter(Boolean);
  const out=[];let code='',name='';
- const norm=s=>String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\u0640/g,'').trim();
- const cleanName=s=>String(s||'').replace(/^\*{1,2}\s*/,'').replace(/\s*\*{1,2}$/,'').replace(/\s+/g,' ').trim();
- const summary=/إجم?ا?ل[ىي].*(?:اليوم|حركات الصنف)|رصيد (?:بداية|نهاية) الفترة|Page\s+\d+\s+of\s+\d+/i;
- const dateRe=/(\d{1,2}:\d{2})\s*([صمAP]M?)?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4})/i;
+ const norm=s=>String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\u0640/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/\s+/g,' ').trim();
+ const cleanName=s=>String(s||'').replace(/^\*{1,2}\s*/,'').replace(/\s*\*{1,2}$/,'').replace(/\s+/g,' ').replace(/^[-–—]+\s*/,'').trim();
+ const summary=/اجمال[ىي].*(?:اليوم|حركات الصنف)|رصيد (?:بداية|نهاية) الفترة|Page\s+\d+\s+of\s+\d+/i;
+ const dateTimeRe=/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4})\s*(?:[-،,]?\s*)?(\d{1,2}:\d{2})\s*([صم]|AM|PM)?|(\d{1,2}:\d{2})\s*([صم]|AM|PM)?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4})/i;
  const knownStaff=['Dr. Ehab Turki','Dr/Do3aa','Poula Hany','Eman Saber','A.Mohsen','Abouda','Esraa','kerols','Rzk'];
- const knownTypes=['تسوية بيع بدون رصيد','مرتجع بيع على فاتورة','مرتجع بيع','مرتجع شراء','تسوية','استلام','إستلم','بيع','شراء','صرف','إضافة','تحويل','هالك','تالف','تسوية جرد'];
- const normalizeType=s=>String(s||'').replace(/\s+/g,' ').trim();
+ const knownTypes=['تسوية بيع بدون رصيد','مرتجع بيع على فاتورة','مرتجع بيع','مرتجع شراء','تسوية جرد','استلام','استلم','بيع','شراء','صرف','اضافة','تحويل','هالك','تالف','تسوية'];
+ const typeKeys=knownTypes.map(t=>({raw:t,key:norm(t)})).sort((a,b)=>b.key.length-a.key.length);
  for(const original of lines){
   const line=norm(original);
   if(summary.test(line))continue;
+  // Product name and product code are printed together on one header line.
+  let cm=line.match(/([A-Za-z0-9_-]{2,})\s*كود\s*الصنف/i);
+  let nm=line.match(/^(.+?)\s*(?:اسم)\s*الصنف/i);
+  if(cm)code=cm[1].trim();
+  if(nm)name=cleanName(nm[1]);
+  if(cm||nm)continue;
+  cm=line.match(/كود\s*الصنف\s*[:：]?\s*([A-Za-z0-9_-]+)/i);
+  nm=line.match(/اسم\s*الصنف\s*[:：]?\s*(.+)$/i);
+  if(cm)code=cm[1].trim(); if(nm)name=cleanName(nm[1]);
+  if(cm||nm)continue;
 
-  // Product header: the report prints the value next to its label, often in RTL extraction order.
-  // Both product fields are printed on the SAME line in this report.
-  let codeMatch=line.match(/([A-Za-z0-9_-]{2,})\s*كود\s*الصنف/i);
-  let nameMatch=line.match(/^(.+?)\s*(?:إسم|اسم)\s*الصنف/i);
-  if(codeMatch) code=codeMatch[1].trim();
-  if(nameMatch) name=cleanName(nameMatch[1]).replace(/^[-–—]+\s*/, '').trim();
-  if(codeMatch||nameMatch) continue;
-  // Alternate extraction order from some PDF viewers.
-  codeMatch=line.match(/(?:كود\s*الصنف)\s*[:：]?\s*([A-Za-z0-9_-]+)/i);
-  nameMatch=line.match(/(?:إسم|اسم)\s*الصنف\s*[:：]?\s*(.+)$/i);
-  if(codeMatch) code=codeMatch[1].trim();
-  if(nameMatch) name=cleanName(nameMatch[1]);
-  if(codeMatch||nameMatch) continue;
-
-  const dm=line.match(dateRe);
+  const dm=line.match(dateTimeRe);
   if(!dm||!code)continue;
-  const date=`${dm[3]} ${dm[1]}${dm[2]?' '+dm[2]:''}`;
-  const prefix=line.slice(0,dm.index).trim();
-  if(!prefix)continue;
-
-  // The row columns, from left to right in the PDF's visual layout, include
-  // employee, destination, document number, quantity, expiry, movement type.
-  // The document number and quantity are the most reliable anchors.
-  const docMatches=[...prefix.matchAll(/(?:^|\s)(\d{4,8})(?=\s|$)/g)];
-  let docNo='',employee='',qty='',type='';
-  if(docMatches.length){
-    const doc=docMatches[docMatches.length-1];
-    docNo=doc[1];
-    const before=prefix.slice(0,doc.index).trim();
-    const staff=knownStaff.find(n=>before.startsWith(n));
-    employee=staff||before.replace(/^[.،|]+\s*/,'').replace(/\s+(?:من فرع|إلى فرع|استبدال|\().*$/,'').trim();
-    const after=prefix.slice(doc.index+doc[0].length).trim();
-    const qm=after.match(/(-?\d+(?:\.\d+)?)/);
-    if(qm){
-      qty=qm[1];
-      const afterQty=after.slice(qm.index+qm[0].length).trim();
-      const typeCandidates=knownTypes.sort((a,b)=>b.length-a.length);
-      type=typeCandidates.find(t=>afterQty.includes(t))||afterQty.replace(/\b\d{1,2}\/\d{4}\b/g,'').trim();
-    }
+  const datePart=dm[1]||dm[6],timePart=dm[2]||dm[4],ampm=dm[3]||dm[5]||'';
+  const date=`${datePart} ${timePart}${ampm?' '+ampm:''}`;
+  let residue=line.replace(dm[0],' ');
+  // Identify the movement type anywhere in the row, independent of PDF column order.
+  const foundType=typeKeys.find(t=>residue.includes(t.key));
+  if(!foundType)continue;
+  const type=foundType.raw;
+  residue=residue.replace(foundType.key,' ');
+  // Remove expiry values before looking for the document number.
+  residue=residue.replace(/\b\d{1,2}\/\d{4}\b/g,' ');
+  const docMatches=[...residue.matchAll(/(?<![\d.])\d{4,8}(?![\d.])/g)];
+  if(!docMatches.length)continue;
+  // Prefer the document number closest to the quantity; ignore year-like values.
+  const doc=docMatches.find(m=>m[0].length!==4)||docMatches[0];
+  const docNo=doc[0];
+  residue=residue.replace(docNo,' ');
+  const qm=residue.match(/[-−]?\d+\.\d{1,3}/);
+  const qty=qm?qm[0].replace('−','-'):'';
+  if(!qty)continue;
+  residue=residue.replace(qm[0],' ');
+  let employee='';
+  const lower=residue.toLowerCase();
+  const staff=knownStaff.find(n=>lower.includes(n.toLowerCase()));
+  if(staff)employee=staff;
+  else {
+    employee=residue.replace(/من فرع.*|الى فرع.*|استبدال|[.،|()]/g,' ').replace(/\s+/g,' ').trim();
   }
-
-  // Fallback for extracted text where columns are not kept in their original order.
-  if(!type){
-    const afterDate=line.slice(dm.index+dm[0].length);
-    type=knownTypes.sort((a,b)=>b.length-a.length).find(t=>line.includes(t))||'';
-  }
-  type=normalizeType(type);
-  employee=employee.replace(/[.،|]+$/,'').trim();
-  if(code&&type){
-    out.push({code,name,type,date,employee,docNo,qty});
-  }
+  out.push({code,name,type,date,employee,docNo,qty});
  }
  return out;
 }
@@ -139,7 +128,7 @@ function addRows(rows){const seen=new Set(allRows.map(r=>[r.code,r.date,r.type,r
 function filtered(){const q=clean($('searchBox').value).toLowerCase(),emp=$('employeeFilter').value,type=$('typeFilter').value,date=$('dateFilter').value;return allRows.filter(r=>(!q||clean(r.code+' '+r.name).toLowerCase().includes(q))&&(!emp||r.employee===emp)&&(!type||r.type===type)&&(!date||r.date.includes(date.split('-').reverse().join('/'))||r.date.includes(date)))}
 function render(){
  const rows=filtered(),body=$('results');$('sMoves').textContent=rows.length.toLocaleString('en');$('sItems').textContent=new Set(rows.map(r=>r.code)).size.toLocaleString('en');$('sStaff').textContent=new Set(rows.map(r=>r.employee).filter(Boolean)).size.toLocaleString('en');
- body.innerHTML=rows.length?rows.map(r=>`<tr><td dir="ltr">${esc(r.code)}</td><td>${esc(r.name)}</td><td><span class="pill">${esc(r.type)}</span></td><td dir="ltr">${esc(r.date)}</td><td dir="ltr">${esc(r.employee||'—')}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">لا توجد نتائج مطابقة للفلاتر</td></tr>';
+ body.innerHTML=rows.length?rows.map(r=>`<tr><td dir="ltr">${esc(r.code)}</td><td>${esc(r.name)}</td><td><span class="pill">${esc(r.type)}</span></td><td dir="ltr">${esc(r.qty||'')}</td><td dir="ltr">${esc(r.docNo||'')}</td><td dir="ltr">${esc(r.date)}</td><td dir="ltr">${esc(r.employee||'—')}</td></tr>`).join(''):'<tr><td colspan="7" class="empty">لا توجد نتائج مطابقة للفلاتر</td></tr>';
  $('resultStatus').textContent=`عرض ${rows.length} من أصل ${allRows.length} حركة`; $('exportBtn').disabled=!rows.length;
  const emps=[...new Set(allRows.map(r=>r.employee).filter(Boolean))].sort(),types=[...new Set(allRows.map(r=>r.type).filter(Boolean))].sort(),oldE=$('employeeFilter').value,oldT=$('typeFilter').value;
  $('employeeFilter').innerHTML='<option value="">كل الموظفين</option>'+emps.map(x=>`<option>${esc(x)}</option>`).join('');$('typeFilter').innerHTML='<option value="">كل أنواع الحركة</option>'+types.map(x=>`<option>${esc(x)}</option>`).join('');$('employeeFilter').value=emps.includes(oldE)?oldE:'';$('typeFilter').value=types.includes(oldT)?oldT:'';
